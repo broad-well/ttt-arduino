@@ -1,4 +1,5 @@
-/* Tic-Tac-Toe for Arduino header file
+/* 
+ * Tic-Tac-Toe for Arduino header file
  *
  * Author: Michael Peng
  * Date: October 4, 2016
@@ -8,7 +9,7 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <LiquidCrystal.h>
+#include "LiquidCrystal.h"
 
 using namespace std;
 
