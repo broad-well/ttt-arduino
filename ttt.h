@@ -15,8 +15,8 @@ using namespace std;
 
 enum TttCell {
 	None = ' ',
-	O = 'O',
-	X = 'X',
+	O = 'O', // 1
+	X = 'X', // -1
 }
 
 struct TttPosition {
@@ -36,23 +36,23 @@ public:
 	void set_cell(TttPosition &pos, TttCell &new_cond);
 	void render(LcdManager &man);
 	void fill(TttCell &condition);
+	char winner();
 };
 
 class TttGame {
 public:
 	TttBoard board;
 	LcdManager lcd;
-	bool is_machine_first;
+	bool is_machine_first; // first person is X
 	bool is_machine_turn;
 
 	TttGame(bool is_machine_first);
 	~TttGame();
 	vector<TttPosition> get_possible_moves();
 	TttCell* cell_at(TttPosition &pos);
-	char winner(); // -1 = None, 0 = O, 1 = X
 	void report_data_to_serial();
 	// algorithm
-	char get_score(bool as_machine);
+	char get_score(bool as_machine, TttBoard* condition);
 	char minimax(int depth);
 };
 

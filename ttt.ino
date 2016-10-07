@@ -34,18 +34,22 @@ void serial_debug(string &msg) {
 }
 
 void serial_debug_enter(string &level) {
+#ifdef TTT_DEBUG
 	if (serial_levels.find(level) == serial_levels.end()) {
 		serial_levels.insert(level);
 		return;
 	}		
 	Serial.println("warn: serial_debug_enter existent level: " + level);
+#endif
 }
 
 void serial_debug_exit() {
+#ifdef TTT_DEBUG
 	if (!serial_levels.empty()) {
 		auto iter = serial_levels.end();
 		serial_levels.erase(--iter);
 	}
+#endif
 }
 
 TttPosition get_position(char x, char y) {
@@ -79,6 +83,7 @@ void TttBoard::render(LcdManager &man) {
 	for(char i0 = 0; i0 < 3; ++i0) {
 		for(char i1 = 0; i1 < 3; ++i1) {
 			vars["s"+to_string(i0)+to_string(i1)] = this->cells[i0][i1];
+			serial_debug("rendered cell "+to_string(i0)+" "+to_string(i1)+" -> "+to_string(this->cells[i0][i1]));
 		}
 	}
 	stringstream sstream;
@@ -129,16 +134,16 @@ TttCell* TttGame::cell_at(TttPosition &pos) {
 	return this->board.get_cell(pos);
 }
 
-char TttGame::winner() {
-	serial_debug_enter("TttGame::winner");
+char TttBoard::winner() {
+	serial_debug_enter("TttBoard::winner");
 	TttCell first_cell;
 	
 	serial_debug("Now checking rows");	
 	// check rows
 	for(char y = 0; y < 3; ++y) {
-		first_cell = *(this->cell_at(get_position(0, y)));
-		if( *(this->cell_at(get_position(1, y))) == first_cell &&
-				*(this->cell_at(get_position(2, y))) == first_cell) {
+		first_cell = *(this->get_cell(get_position(0, y)));
+		if( *(this->get_cell(get_position(1, y))) == first_cell &&
+				*(this->get_cell(get_position(2, y))) == first_cell) {
 			serial_debug("Row winner found: " + to_string(first_cell));
 			serial_debug_exit();
 			return static_cast<char>(first_cell);
@@ -148,9 +153,9 @@ char TttGame::winner() {
 	serial_debug("Now checking columns");
 	// check columns
 	for(char x = 0; x < 3; ++x) {
-		first_cell = *(this->cell_at(get_position(x, 0)));
-		if( *(this->cell_at(get_position(x, 1))) == first_cell &&
-				*(this->cell_at(get_position(x, 2))) == first_cell) {
+		first_cell = *(this->get_cell(get_position(x, 0)));
+		if( *(this->get_cell(get_position(x, 1))) == first_cell &&
+				*(this->get_cell(get_position(x, 2))) == first_cell) {
 			serial_debug("Column winner found: " + to_string(first_cell));
 			serial_debug_exit();
 			return static_cast<char>(first_cell);
@@ -159,12 +164,12 @@ char TttGame::winner() {
 	
 	serial_debug("Now checking diagonals");
 	// check diagonals
-	first_cell = *(this->cell_at(get_position(1, 1))); // middle cell
+	first_cell = *(this->get_cell(get_position(1, 1))); // middle cell
 
-	if( ( *(this->cell_at(get_position(0, 0))) == first_cell &&
-				*(this->cell_at(get_position(2, 2))) == first_cell ) ||
-			( *(this->cell_at(get_position(0, 2))) == first_cell &&
-				*(this->cell_at(get_position(2, 0))) == first_cell ) {
+	if( ( *(this->get_cell(get_position(0, 0))) == first_cell &&
+				*(this->get_cell(get_position(2, 2))) == first_cell ) ||
+			( *(this->get_cell(get_position(0, 2))) == first_cell &&
+				*(this->get_cell(get_position(2, 0))) == first_cell ) {
 			serial_debug("Diagonal winner found: " + to_string(first_cell));
 			serial_debug_exit();
 			return static_cast<char>(first_cell);
@@ -177,4 +182,27 @@ void TttGame::report_data_to_serial() {
 	stringstream ss;
 	ss << "TttGameReport => is_machine_turn: " << this->is_machine_turn << "; current winner: " << this->winner() << "; board side_msg: " << this->board.side_msg;
 	Serial.println(ss.str());
+}
+
+// algorithm functions
+
+#define SCORE_UNIT 10
+
+char get_cell_char(TttCell& cell) {
+		default:
+			warn("get_cell_char: invalid cell: " + string(static_cast<char>(cell)));
+	switch(static_cast<char>(cell)) {
+		case ' ':
+			return 0;
+		case 'O':
+			return 1;
+		case 'X':
+			return -1;
+		default:
+			warn("get_cell_char: invalid cell: " + string(static_cast<char>(cell)));
+}
+
+char TttGame::get_score(bool as_machine, TttBoard* condition) {
+	return condition->winner() * (is_machine_first ? -1 : 1) * SCORE_UNIT;
+
 }
