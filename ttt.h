@@ -24,6 +24,7 @@ struct TttPosition {
 	char y;
 };
 
+// Also represents a game condition
 class TttBoard {
 public:
 	TttCell cells[3][3];
@@ -53,7 +54,7 @@ public:
 	void report_data_to_serial();
 	// algorithm
 	char get_score(bool as_machine, TttBoard* condition);
-	char minimax(int depth);
+	char minimax(int* depth);
 };
 
 

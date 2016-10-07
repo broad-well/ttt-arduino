@@ -189,8 +189,6 @@ void TttGame::report_data_to_serial() {
 #define SCORE_UNIT 10
 
 char get_cell_char(TttCell& cell) {
-		default:
-			warn("get_cell_char: invalid cell: " + string(static_cast<char>(cell)));
 	switch(static_cast<char>(cell)) {
 		case ' ':
 			return 0;
@@ -204,5 +202,8 @@ char get_cell_char(TttCell& cell) {
 
 char TttGame::get_score(bool as_machine, TttBoard* condition) {
 	return condition->winner() * (is_machine_first ? -1 : 1) * SCORE_UNIT;
+}
 
+char TttGame::minimax(int* depth) {
+	
 }
