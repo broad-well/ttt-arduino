@@ -1,7 +1,7 @@
 # Tic-Tac-Toe Arduino Expectations and To-Do List
 
 ## Features
-- [ ] Ability to do multiple games without a reset
+- [ ] Ability to do multiple games without a physical reset (push button)
 - [ ] MiniMax algorithm with low resource usage
 - [ ] Three-button controls instead of 9
 

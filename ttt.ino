@@ -52,158 +52,165 @@ void serial_debug_exit() {
 #endif
 }
 
-TttPosition get_position(char x, char y) {
-	TttPosition pos;
+void warn(string& msg) {
+	if (Serial.available()) {
+		Serial.println("!WARN! " + msg);
+	}
+}
+
+// new functional design
+
+/* Fundamental codes (representations) for elements
+ * 'O' for O selection
+ * 'X' for X selection
+ *
+ * note: while accessing the array to place positions, x and y are inversed. That should be the only place the inversion takes place. i.e. "board[y][x]"
+ */
+
+// variables that are volatile
+string lcd_lines[4];
+
+// simplification of position representation
+struct position {
+	unsigned char x;
+	unsigned char y;
+};
+
+// The following variables are per-game only and should be reset when a new game is initiated.
+char board[3][3] = {}; 
+position selected_position;
+char machine_char;
+
+// create positions easily
+position get_pos(char x, char y) {
+	position pos;
 	pos.x = x;
 	pos.y = y;
 	return pos;
 }
 
-// define items in ttt.h
-
-TttBoard::TttBoard(TttGame* game) {
-	serial_debug_enter("TttBoard_init");
-	this->game = game;
-	this->fill(None);
-	serial_debug("Initialized new TttBoard object");
-	serial_debug_exit();
+// set the cell of position on the board to a specified value
+// ONLY places where x and y are inversed
+// 4 upcoming functions
+void set_cell(position& pos, char val) {
+	position[pos.y][pos.x] = val;
+}
+void set_cell(char x, char y, char val) {
+	position[y][x] = val;
+}
+char get_cell(position& pos) {
+	return position[pos.y][pos.x];
+}
+char get_cell(char x, char y) {
+	return position[y][x];
 }
 
-TttCell* TttBoard::get_cell(TttPosition &pos) {
-	return &(this->cells[pos.y][pos.x]);
+// ----- LCD START -----
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+// board cell selection increment; this uses an algorithm similar to converting numbers of different bases.
+void selection_operation(bool add) {
+	char uninum = selected_position.y * 3 + selected_position.x;
+	uninum = (uninum + (add ? 1 : 8)) % 9;
+	selected_position.y = floor(uninum / 3);
+	selected_position.x = num - (selected_position.y * 3);
+}
+// Increment selection
+void sel_incr() {
+	selection_operation(true);
+}
+// Decrement selection
+void sel_decr() {
+	selection_operation(false);
 }
 
-void TttBoard::set_cell(TttPosition &pos, TttCell &new_cond) {
-	this->cells[pos.y][pos.x] = new_cond;
+// Cursor character for cell selection
+const byte cursor_char[8] = {
+	B11111,
+	B11111,
+	B11011,
+	B10101,
+	B11011,
+	B11111,
+	B11111
+};
+
+// LCD formatting backbone; x first, y second for cell expressions
+const string lcd_backbone[4] = {
+	"{line0}{cell00}|{cell10}|{cell20}",
+	"{line1}{cell01}|{cell11}|{cell21}",
+	"{line2}{cell02}|{cell12}|{cell22}",
+	"{line3} TTT MP"
 }
 
-void TttBoard::render(LcdManager &man) {
-	serial_debug_enter("TttBoard::render");
-	map<string,string> vars;
-	for(char i0 = 0; i0 < 3; ++i0) {
-		for(char i1 = 0; i1 < 3; ++i1) {
-			vars["s"+to_string(i0)+to_string(i1)] = this->cells[i0][i1];
-			serial_debug("rendered cell "+to_string(i0)+" "+to_string(i1)+" -> "+to_string(this->cells[i0][i1]));
+// Use this function to replace all {...}s with actual values
+void replace_var(string& orig, const unordered_map<string, string>& keyval) {
+	size_t loc;
+	for (auto keyval_pair: keyval) {
+		loc = orig.find("{" + keyval_pair.first + "}");
+		if (loc != string::npos) {
+			orig.replace(loc, keyval_pair.first.length() + 2, keyval_pair.second);
+			continue;
 		}
-	}
-	stringstream sstream;
-	sstream << left << setw(15) << this->side_msg;
-	vars["msg"] = sstream.str();
-	vars["player_points"] = to_string(player_points);
-	vars["machine_points"] = to_string(machine_points);
-	man.update(vars);
-	serial_debug_exit();
-}
-
-void TttBoard::fill(TttCell &condition) {
-	for(char y = 0; y < 3; ++y) {
-		for(char x = 0; x < 3; ++x) {
-			this->set_cell(get_position(x, y), condition);
-		}
+		warn("replace_var: var not found: " + keyval_pair.first + " from " + orig);
 	}
 }
 
-TttGame::TttGame(bool is_machine_first) {
-	serial_debug_enter("TttGame_init");
-	this->is_machine_first = is_machine_first;
-	this->is_machine_turn = is_machine_first;
-	this->board = new TttBoard(this);
-	this->lcd = new LcdManager(this);
-	serial_debug("Initialized new TttGame object");
-	serial_debug_exit();
-}
-
-~TttGame::TttGame() {
-	delete this->board;
-	delete this->lcd;
-}
-
-vector<TttPosition> TttGame::get_possible_moves() {
-	vector<TttPosition> moves;
-	for(char y = 0; y < 3; ++y) {
-		for(char x = 0; x < 3; ++x) {
-			if(this->board.get_cell(get_position(x, y)) == None) {
-				moves.push_back(get_position(x, y));
-			}
-		}
-	}
-	return moves;
-}
-
-TttCell* TttGame::cell_at(TttPosition &pos) {
-	return this->board.get_cell(pos);
-}
-
-char TttBoard::winner() {
-	serial_debug_enter("TttBoard::winner");
-	TttCell first_cell;
-	
-	serial_debug("Now checking rows");	
-	// check rows
-	for(char y = 0; y < 3; ++y) {
-		first_cell = *(this->get_cell(get_position(0, y)));
-		if( *(this->get_cell(get_position(1, y))) == first_cell &&
-				*(this->get_cell(get_position(2, y))) == first_cell) {
-			serial_debug("Row winner found: " + to_string(first_cell));
-			serial_debug_exit();
-			return static_cast<char>(first_cell);
-		}
-	}
-	
-	serial_debug("Now checking columns");
-	// check columns
-	for(char x = 0; x < 3; ++x) {
-		first_cell = *(this->get_cell(get_position(x, 0)));
-		if( *(this->get_cell(get_position(x, 1))) == first_cell &&
-				*(this->get_cell(get_position(x, 2))) == first_cell) {
-			serial_debug("Column winner found: " + to_string(first_cell));
-			serial_debug_exit();
-			return static_cast<char>(first_cell);
-		}
-	}
-	
-	serial_debug("Now checking diagonals");
-	// check diagonals
-	first_cell = *(this->get_cell(get_position(1, 1))); // middle cell
-
-	if( ( *(this->get_cell(get_position(0, 0))) == first_cell &&
-				*(this->get_cell(get_position(2, 2))) == first_cell ) ||
-			( *(this->get_cell(get_position(0, 2))) == first_cell &&
-				*(this->get_cell(get_position(2, 0))) == first_cell ) {
-			serial_debug("Diagonal winner found: " + to_string(first_cell));
-			serial_debug_exit();
-			return static_cast<char>(first_cell);
-	}
-
-	return None;
-}
-
-void TttGame::report_data_to_serial() {
+// fill line[0-3] to reach 15 (desired length) for correct board display.
+// manipulates the powerful stream capabilities
+string& fill_line_msg(string& line) {
 	stringstream ss;
-	ss << "TttGameReport => is_machine_turn: " << this->is_machine_turn << "; current winner: " << this->winner() << "; board side_msg: " << this->board.side_msg;
-	Serial.println(ss.str());
+	ss << left << setfill(' ') << setw(15) << line;
+	line = ss.str();
 }
 
-// algorithm functions
-
-#define SCORE_UNIT 10
-
-char get_cell_char(TttCell& cell) {
-	switch(static_cast<char>(cell)) {
-		case ' ':
-			return 0;
-		case 'O':
-			return 1;
-		case 'X':
-			return -1;
-		default:
-			warn("get_cell_char: invalid cell: " + string(static_cast<char>(cell)));
+// ready the LCD for further actions
+void lcd_setup() {
+	lcd.createChar(0, cursor_char);
+	lcd.begin(20, 4);
 }
 
-char TttGame::get_score(bool as_machine, TttBoard* condition) {
-	return condition->winner() * (is_machine_first ? -1 : 1) * SCORE_UNIT;
+// generate key -> value pairs like {cell00} -> 'O' and {cell20} -> '\0'
+unordered_map<string, string> generate_row_cell_keyvals(char y) {
+	unordered_map<string, string> keyval;
+	for (char x = 0; x < 3; ++x) {
+		keyval["cell" + to_string(x) + to_string(y)] = get_cell(x, y);
+	}
 }
 
-char TttGame::minimax(int* depth) {
+// calls the previous function 3 times to get all cells returned
+unordered_map<string, string> generate_all_cells_keyvals() {
+	unordered_map<string, string> output;
+	unordered_map<string, string> per_row;
+	for (char y = 0; y < 3; ++y) {
+		per_row = generate_row_cell_keyvals(y);
+		output.insert(per_row.start(), per_row.end());
+	}
+	return output;
+}
+
+// update a line of information on the LCD. (argument should be in range of 0 to 3)
+void lcd_update_line(char line) {
+	unordered_map<string, string> all_keyval;
 	
+	// if first 3 lines, then generate keyvals
+	if (line < 3) {
+		unordered_map<string, string> cell_keyval = generate_row_cell_keyvals(line);
+		all_keyval.insert(cell_keyval.start(), cell_keyval.end());
+	}
+	
+	all_keyval["line" + to_string(line)] = fill_line_msg(lcd_lines[line]);
+	lcd.setCursor(0, line);
+	string line_output = lcd_backbone[line];
+	replace_var(line_output, all_keyval);
+	if (line_output.length() != 20) 
+		warn("lcd_update_line: line_output is not 20 chars long: " + line_output);
+	lcd.print(line_output);	
+}
+
+// update all lines
+void lcd_render() {
+	for (char i = 0; i < 4; ++i) {
+		lcd_update_line(i);
+	}
 }
