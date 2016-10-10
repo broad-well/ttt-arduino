@@ -1,9 +1,9 @@
 # Tic-Tac-Toe Arduino Expectations and To-Do List
 
 ## Features
-- [ ] Ability to do multiple games without a physical reset (push button)
+- [x] Ability to do multiple games without a physical reset (push button)
 - [ ] MiniMax algorithm with low resource usage
-- [ ] Three-button controls instead of 9
+- [x] Three-button controls instead of 9
 
 ## Process
 - [ ] Display empty board and score counter on display
@@ -13,7 +13,7 @@
 - [ ] Display whose turn it is on the display
 
 ### User selection subroutine
-- [ ] A cursor will be able to select a cell on the board, controlled with _Selection *_ buttons
+- [x] A cursor will be able to select a cell on the board, controlled with _Selection *_ buttons
 - [ ] Press _Select_ to select the highlighted cell and place the X in it
 
 ### When one wins

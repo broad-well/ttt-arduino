@@ -9,6 +9,7 @@
 #include "ttt.h"
 #include <algorithm>
 #include <set>
+#include <unordered_set>
 
 #define TTT_ARDUINO
 #define TTT_DEBUG
@@ -108,6 +109,9 @@ char get_cell(char x, char y) {
 // ----- LCD START -----
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
+// replacements use unordered_map<string, string>, but that is too long.
+typedef unordered_map<string, string> ReplaceMap;
+
 // board cell selection increment; this uses an algorithm similar to converting numbers of different bases.
 void selection_operation(bool add) {
 	char uninum = selected_position.y * 3 + selected_position.x;
@@ -144,7 +148,7 @@ const string lcd_backbone[4] = {
 }
 
 // Use this function to replace all {...}s with actual values
-void replace_var(string& orig, const unordered_map<string, string>& keyval) {
+void replace_var(string& orig, const ReplaceMap& keyval) {
 	size_t loc;
 	for (auto keyval_pair: keyval) {
 		loc = orig.find("{" + keyval_pair.first + "}");
@@ -171,17 +175,17 @@ void lcd_setup() {
 }
 
 // generate key -> value pairs like {cell00} -> 'O' and {cell20} -> '\0'
-unordered_map<string, string> generate_row_cell_keyvals(char y) {
-	unordered_map<string, string> keyval;
+ReplaceMap generate_row_cell_keyvals(char y) {
+	ReplaceMap keyval;
 	for (char x = 0; x < 3; ++x) {
 		keyval["cell" + to_string(x) + to_string(y)] = get_cell(x, y);
 	}
 }
 
 // calls the previous function 3 times to get all cells returned
-unordered_map<string, string> generate_all_cells_keyvals() {
-	unordered_map<string, string> output;
-	unordered_map<string, string> per_row;
+ReplaceMap generate_all_cells_keyvals() {
+	ReplaceMap output;
+	ReplaceMap per_row;
 	for (char y = 0; y < 3; ++y) {
 		per_row = generate_row_cell_keyvals(y);
 		output.insert(per_row.start(), per_row.end());
@@ -191,11 +195,11 @@ unordered_map<string, string> generate_all_cells_keyvals() {
 
 // update a line of information on the LCD. (argument should be in range of 0 to 3)
 void lcd_update_line(char line) {
-	unordered_map<string, string> all_keyval;
+	ReplaceMap all_keyval;
 	
 	// if first 3 lines, then generate keyvals
 	if (line < 3) {
-		unordered_map<string, string> cell_keyval = generate_row_cell_keyvals(line);
+		ReplaceMap cell_keyval = generate_row_cell_keyvals(line);
 		all_keyval.insert(cell_keyval.start(), cell_keyval.end());
 	}
 	
@@ -213,4 +217,79 @@ void lcd_render() {
 	for (char i = 0; i < 4; ++i) {
 		lcd_update_line(i);
 	}
+}
+
+// sets the cursor to the specified position
+void place_cursor(position& pos) {
+	// x = 0 -> col = 15; x = 1 -> col = 17; x = 2 -> col = 19; y -> row
+	lcd.setCursor(15 + (pos.x * 2), pos.y);
+}
+
+// sets a cell to a certain value; great for board manipulation
+void render_cell(position& pos, char value) {
+	place_cursor(pos);
+	lcd.write(value);
+}
+
+// updates a row of cells on the board
+void update_row(char row_num) {
+	for (char x = 0; x < 3; ++x) {
+		render_cell(get_pos(x, row_num), get_cell(x, row_num));
+	}
+}
+
+// enumerate calling update_row to update entire board
+void update_board() {
+	for (char y = 0; y < 3; ++y) {
+		update_row(y);
+	}
+}
+
+// ----- LCD END -----
+
+// ----- BOARD MANIPULATION START -----
+
+// returns all cells on the board that are not occupied (has ' ' value)
+unordered_set<position> get_vacant_cells() {
+	unordered_set<position> positions;
+
+	// iterate through all cells	
+	for (char y = 0; y < 3; ++y) {
+		for (char x = 0; x < 3; ++x) {
+			if (get_cell(x, y) == ' ')
+				positions.insert(get_pos(x, y));
+		}
+	}
+
+	return positions;
+}
+
+const array<array<pair<char, char>, 3>, 8> winning_patterns = {{
+	{{0,0}, {1,0}, {2,0}},
+	{{0,1}, {1,1}, {2,1}},
+	{{0,2}, {1,2}, {2,2}},
+
+	{{0,0}, {0,1}, {0,2}},
+	{{1,0}, {1,1}, {1,2}},
+	{{2,0}, {2,1}, {2,2}},
+
+	{{0,0}, {1,1}, {2,2}},
+	{{0,2}, {1,1}, {2,0}}
+}};
+
+// a shorthand for get_winner function
+char cell_at(pair<char, char>& pos) {
+	return get_cell(pos.first(), pos.second());
+}
+
+// will return ' ' for no winner yet
+char get_winner(char& condition[3][3]) {
+	for (auto& pattern: winning_patterns) {
+		char first_pos = cell_at(pattern[0]);
+		
+		if (cell_at(pattern[1]) == first_pos &&
+			  cell_at(pattern[2]) == first_pos)
+			return first_pos;
+	}
+	return ' ';
 }
