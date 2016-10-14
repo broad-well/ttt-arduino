@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <set>
 #include <unordered_set>
+#include <functional>
+#include <unordered_map>
 
 #define TTT_ARDUINO
 #define TTT_DEBUG
@@ -249,14 +251,25 @@ void update_board() {
 
 // ----- BOARD MANIPULATION START -----
 
+// simplify Condition
+typedef char Condition[3][3];
+
+// only Condition handlers where y and x are inversed
+char get_cell(Condition& cond, char x, char y) {
+	return cond[y][x];
+}
+void set_cell(Condition& cond, char x, char y, char val) {
+	cond[y][x] = val;
+}
+
 // returns all cells on the board that are not occupied (has ' ' value)
-unordered_set<position> get_vacant_cells() {
+unordered_set<position> get_vacant_cells(Condition& cond) {
 	unordered_set<position> positions;
 
 	// iterate through all cells	
 	for (char y = 0; y < 3; ++y) {
 		for (char x = 0; x < 3; ++x) {
-			if (get_cell(x, y) == ' ')
+			if (get_cell(cond, x, y) == ' ')
 				positions.insert(get_pos(x, y));
 		}
 	}
@@ -283,7 +296,7 @@ char cell_at(pair<char, char>& pos) {
 }
 
 // will return ' ' for no winner yet
-char get_winner(char& condition[3][3]) {
+char get_winner(Condition& condition) {
 	for (auto& pattern: winning_patterns) {
 		char first_pos = cell_at(pattern[0]);
 		
@@ -292,4 +305,67 @@ char get_winner(char& condition[3][3]) {
 			return first_pos;
 	}
 	return ' ';
+}
+
+char player_char() {
+	return machine_char == 'O' ? 'X' : 'O';
+}
+
+char get_score(char winner, long depth) {
+	return winner == machine_char ? 10 - depth: (winner == ' ' ? 0 : depth - 10);
+}
+
+// returns score of worst move
+char min_move(Condition cond, long depth) {
+	char winner = get_winner(cond);
+	if (winner != ' ')
+		return get_score(winner, depth);
+
+	char this_score;
+	char lowest_score = 127; // highest char possible
+	for (position vacant_pos: get_vacant_cells(cond)) {
+		set_cell(cond, vacant_pos.x, vacant_pos.y, machine_char);
+		this_score = max_move(cond, depth+1);
+		if (this_score < lowest_score)
+			lowest_score = this_score;
+		set_cell(cond, vacant_pos.x, vacant_pos.y, ' ');
+	}
+
+	return lowest_score;
+}
+
+// returns score of best move
+char max_move(Condition cond, long depth) {
+	char winner = get_winner(cond);
+	if (winner != ' ')
+		return get_score(winner, depth);
+
+	char this_score;
+	char highest_score = -127; // lowest signed char possible
+	for (position vacant_pos: get_vacant_cells(cond)) {
+		set_cell(cond, vacant_pos.x, vacant_pos.y, player_char());
+		this_score = min_move(cond, depth+1);
+		if (this_score > highest_score)
+			highest_score = this_score;
+		set_cell(cond, vacant_pos.x, vacant_pos.y, ' ');
+	}
+
+	return highest_score;
+}
+
+position minimax(Condition cond) {
+	char best_score = -127;
+	position best_move;
+	
+	char score;
+	for (position vacant_pos: get_vacant_cells(cond)) {
+		set_cell(cond, vacant_pos.x, vacant_pos.y, machine_char);
+		score = max_move(cond, 1);
+		if (score > best_score) {
+			best_score = score;
+			best_move = vacant_pos;
+		}
+	}
+
+	return best_move;
 }

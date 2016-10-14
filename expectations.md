@@ -2,7 +2,7 @@
 
 ## Features
 - [x] Ability to do multiple games without a physical reset (push button)
-- [ ] MiniMax algorithm with low resource usage
+- [ ] Algorithm with low resource usage
 - [x] Three-button controls instead of 9
 
 ## Process
