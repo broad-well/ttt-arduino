@@ -68,10 +68,16 @@ void warn(string& msg) {
  * 'X' for X selection
  *
  * note: while accessing the array to place positions, x and y are inversed. That should be the only place the inversion takes place. i.e. "board[y][x]"
+ *
+ * Pins: LCD=>12,11,5,4,3,2 SEL1=>6 SEL2=>7 SEL=>8
  */
 
 // variables that are volatile
 string lcd_lines[4];
+
+// should not be reset anywhere
+char machine_score = 0;
+char player_score = 0;
 
 // simplification of position representation
 struct position {
@@ -214,6 +220,11 @@ void lcd_update_line(char line) {
 	lcd.print(line_output);	
 }
 
+void set_line(char linenum, string content) {
+	lcd_lines[linenum] = content;
+	lcd_update_line(linenum);
+}
+
 // update all lines
 void lcd_render() {
 	for (char i = 0; i < 4; ++i) {
@@ -245,6 +256,11 @@ void update_board() {
 	for (char y = 0; y < 3; ++y) {
 		update_row(y);
 	}
+}
+
+// updates score counter (last line)
+void lcd_score() {
+	set_line(3, "Player: " + to_string(player_score) + "; Self: " + to_string(machine_score));
 }
 
 // ----- LCD END -----
@@ -315,6 +331,17 @@ char get_score(char winner, long depth) {
 	return winner == machine_char ? 10 - depth: (winner == ' ' ? 0 : depth - 10);
 }
 
+void clear_board() {
+	for (char y = 0; y < 3; ++y) {
+		for (char x = 0; x < 3; ++x) {
+			board[x][y] = ' ';
+		}
+	}
+}
+
+// ----- BOARD MANIPULATION END -----
+// ----- ALGORITHM START -----
+
 // returns score of worst move
 char min_move(Condition cond, long depth) {
 	char winner = get_winner(cond);
@@ -369,3 +396,53 @@ position minimax(Condition cond) {
 
 	return best_move;
 }
+
+// ----- ALGORITHM END -----
+
+// ----- SIMPLE BUTTON MANIPULATION -----
+// pin numbers
+#define SEL1 6
+#define SEL2 7
+#define SEL 8
+
+void setup_buttons() {
+	pinMode(SEL1, INPUT);
+	pinMode(SEL2, INPUT);
+	pinMode(SEL, INPUT);
+}
+
+short wait_button() {
+	while (true) {
+		if (digitalRead(SEL1) == HIGH)
+			return SEL1;
+		if (digitalRead(SEL2) == HIGH)
+			return SEL2;
+		if (digitalRead(SEL) == HIGH)
+			return SEL;
+	}
+}
+
+void wait_button(short btn_pin) {
+	while (digitalRead(btn_pin) == LOW);
+}
+
+// ----- ARDUINO setup(), loop() -----
+
+void setup() {
+	Serial.begin(9600);
+	lcd_setup();
+	setup_buttons();
+	// Lcd/button initialization done	
+}
+
+void loop() {
+	// new game
+	clear_board();
+	set_line(0, "Welcome");
+	set_line(1, "SEL1=mefirst");
+	set_line(2, "SEL2=youfirst");
+	lcd_score();
+
+}
+
+// ----- ARDUINO setup(), loop() END -----

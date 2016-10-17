@@ -2,14 +2,13 @@
 
 ## Features
 - [x] Ability to do multiple games without a physical reset (push button)
-- [ ] Algorithm with low resource usage
+- [x] Algorithm with low resource usage
 - [x] Three-button controls instead of 9
 
 ## Process
-- [ ] Display empty board and score counter on display
+- [x] Display empty board and score counter on display
 - [ ] Press _Selection 1_ for _computer starts first_
 - [ ] Press _Selection 2_ for _user starts first_
-- [ ] Press _Select_ button to begin
 - [ ] Display whose turn it is on the display
 
 ### User selection subroutine
