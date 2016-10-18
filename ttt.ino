@@ -71,6 +71,7 @@ void warn(string& msg) {
  *
  * Pins: LCD=>12,11,5,4,3,2 SEL1=>6 SEL2=>7 SEL=>8
  */
+#define TTT_FIRST_CHAR 'X'
 
 // variables that are volatile
 string lcd_lines[4];
@@ -78,6 +79,7 @@ string lcd_lines[4];
 // should not be reset anywhere
 char machine_score = 0;
 char player_score = 0;
+char current_turn;
 
 // simplification of position representation
 struct position {
@@ -174,6 +176,8 @@ string& fill_line_msg(string& line) {
 	stringstream ss;
 	ss << left << setfill(' ') << setw(15) << line;
 	line = ss.str();
+	return line;
+	// does not get deleted because it is a parameter
 }
 
 // ready the LCD for further actions
@@ -247,7 +251,8 @@ void render_cell(position& pos, char value) {
 // updates a row of cells on the board
 void update_row(char row_num) {
 	for (char x = 0; x < 3; ++x) {
-		render_cell(get_pos(x, row_num), get_cell(x, row_num));
+		render_cell(get_pos(x, row_num), selected_position == get_pos(x, row_num) ?
+			0 : get_cell(x, row_num));
 	}
 }
 
@@ -404,6 +409,7 @@ position minimax(Condition cond) {
 #define SEL1 6
 #define SEL2 7
 #define SEL 8
+#define BTNs {SEL1,SEL2,SEL}
 
 void setup_buttons() {
 	pinMode(SEL1, INPUT);
@@ -411,19 +417,41 @@ void setup_buttons() {
 	pinMode(SEL, INPUT);
 }
 
-short wait_button() {
+short waitbtn(short[] btn_pins) {
 	while (true) {
-		if (digitalRead(SEL1) == HIGH)
-			return SEL1;
-		if (digitalRead(SEL2) == HIGH)
-			return SEL2;
-		if (digitalRead(SEL) == HIGH)
-			return SEL;
+		for (short btnpin: btn_pins) {
+			if (digitalRead(btnpin) == HIGH)
+				return btnpin;
+		}
 	}
+}
+
+short wait_button() {
+	short btns[] = BTNs;
+	return waitbtn(btns);
+}
+
+short wait_choice() {
+	short btns[] = {SEL1, SEL2};
+	return waitbtn(btns);
 }
 
 void wait_button(short btn_pin) {
 	while (digitalRead(btn_pin) == LOW);
+}
+
+void user_cell_choice() {
+	short btn;
+	while (true) {
+		btn = wait_button();
+		if (btn == SEL)
+			break;
+		if (btn == SEL1)
+			sel_decr();
+		if (btn == SEL2)
+			sel_incr();
+		update_board();
+	}
 }
 
 // ----- ARDUINO setup(), loop() -----
@@ -442,7 +470,19 @@ void loop() {
 	set_line(1, "SEL1=mefirst");
 	set_line(2, "SEL2=youfirst");
 	lcd_score();
-
+	{
+		// selection of who starts first
+		short choice = wait_choice();
+		machine_char = (choice == SEL1 ?
+			TTT_FIRST_CHAR :
+			(TTT_FIRST_CHAR == 'O' : 'X' : 'O'));
+		current_turn = (choice == SEL1 ? machine_char : player_char());
+	}
+	set_line(0, (machine_char == TTT_FIRST_CHAR ? "My" : "Your") + " turn");
+	while (get_winner() == ' ') {
+		// todo: minimax calling / user_cell_choice
+		current_turn = current_turn == 'O' ? 'X' : 'O';	
+	}
 }
 
 // ----- ARDUINO setup(), loop() END -----
