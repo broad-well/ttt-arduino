@@ -268,6 +268,12 @@ void lcd_score() {
 	set_line(3, "Player: " + to_string(player_score) + "; Self: " + to_string(machine_score));
 }
 
+void clear_lines() {
+	for (short i = 0; i < 4; ++i) {
+		set_line(i, "");
+	}
+}
+
 // ----- LCD END -----
 
 // ----- BOARD MANIPULATION START -----
@@ -329,7 +335,7 @@ char get_winner(Condition& condition) {
 }
 
 char player_char() {
-	return machine_char == 'O' ? 'X' : 'O';
+	return other(machine_char);
 }
 
 char get_score(char winner, long depth) {
@@ -342,6 +348,14 @@ void clear_board() {
 			board[x][y] = ' ';
 		}
 	}
+}
+
+char other(char orig) {
+	if (orig != 'O' && orig != 'X') {
+		warn("Invalid parameter(orig): " + to_string(orig));
+		return ' ';
+	}
+	return orig == 'O' ? 'X' : 'O';
 }
 
 // ----- BOARD MANIPULATION END -----
@@ -456,14 +470,16 @@ void user_cell_choice() {
 
 // ----- ARDUINO setup(), loop() -----
 
-void setup() {
+void setup() 
+{
 	Serial.begin(9600);
 	lcd_setup();
 	setup_buttons();
 	// Lcd/button initialization done	
 }
 
-void loop() {
+void loop() 
+{
 	// new game
 	clear_board();
 	set_line(0, "Welcome");
@@ -475,14 +491,42 @@ void loop() {
 		short choice = wait_choice();
 		machine_char = (choice == SEL1 ?
 			TTT_FIRST_CHAR :
-			(TTT_FIRST_CHAR == 'O' : 'X' : 'O'));
+			other(TTT_FIRST_CHAR));
 		current_turn = (choice == SEL1 ? machine_char : player_char());
 	}
-	set_line(0, (machine_char == TTT_FIRST_CHAR ? "My" : "Your") + " turn");
-	while (get_winner() == ' ') {
-		// todo: minimax calling / user_cell_choice
-		current_turn = current_turn == 'O' ? 'X' : 'O';	
+	while (get_winner() == ' ') {	
+		if (current_turn == machine_char) {
+			set_line(0, "My turn");
+			set_cell(minimax((Condition) board), current_turn);
+		} else {
+			set_line(0, "Your turn");
+			user_cell_choice();
+			set_cell(selected_position, current_turn);
+		}
+		if (get_vacant_cells.empty())
+			break;
+		current_turn = other(current_turn);
 	}
+	clear_lines();
+	switch (get_winner()) {
+	case ' ':
+		// tie
+		set_line(1, "Tie!");
+		break;
+	case machine_char:
+		// machine wins
+		set_line(1, "I win!");
+		break;
+	case player_char():
+		// user wins
+		set_line(1, "You win...");
+		set_line(2, "Unbelievable.");
+	default:
+		set_line(3, "ERROR! winner");
+		warn("Winner char unknown -> " + to_string(get_winner()));
+	}
+	set_line(0, "SELECT new game");
+	wait_button(SEL);
 }
 
 // ----- ARDUINO setup(), loop() END -----
