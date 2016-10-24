@@ -1,2 +1,4 @@
 # committing from (neo)vim
 *.swp
+.pioenvs
+.piolibdeps

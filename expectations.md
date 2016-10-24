@@ -16,12 +16,12 @@
 - [x] Press _Select_ to select the highlighted cell and place the X in it
 
 ### When one wins
-- [ ] Display information on display as `line1`
-- [ ] Display `Nice` or `Shame on you` accordingly
+- [x] Display information on display as `line1`
+- [x] Display `Nice` or `Shame on you` accordingly
 
 ### When tie
-- [ ] Display information on display as `line1`
-- [ ] Display `who's better?` as `line2`
+- [x] Display information on display as `line1`
+- [x] Display `who's better?` as `line2`
 
 ## Final part
-- [ ] Press _Select_ to play another game
+- [x] Press _Select_ to play another game
