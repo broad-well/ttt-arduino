@@ -10,7 +10,7 @@
 #include "LiquidCrystal.h"
 #undef min
 #undef max
-#undef map
+#undef map(long, long, long, long, long)
 #undef set
 #undef abs
 #undef serial_debug
@@ -19,6 +19,8 @@
 #include <set>
 #include <functional>
 #include <map>
+#include <sstream>
+#include <iomanip>
 
 #define TTT_ARDUINO
 #define TTT_DEBUG
@@ -49,7 +51,7 @@ void serial_debug_enter(string &level) {
 		serial_levels.insert(level);
 		return;
 	}		
-	Serial.println("warn: serial_debug_enter existent level: " + level);
+	Serial.println(("warn: serial_debug_enter existent level: " + level).c_str());
 #endif
 }
 
@@ -64,7 +66,7 @@ void serial_debug_exit() {
 
 void warn(string& msg) {
 	if (Serial.available()) {
-		Serial.println("!WARN! " + msg);
+		Serial.println(("!WARN! " + msg).c_str());
 	}
 }
 
