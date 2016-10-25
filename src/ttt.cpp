@@ -8,34 +8,23 @@
 
 #include "Arduino.h"
 #include "LiquidCrystal.h"
-#undef min
-#undef max
-#undef map(long, long, long, long, long)
-#undef set
-#undef abs
-#undef serial_debug
 
-#include <algorithm>
 #include <set>
-#include <functional>
-#include <map>
-#include <sstream>
-#include <iomanip>
+#include <string>
 
 #define TTT_ARDUINO
 #define TTT_DEBUG
 
-using namespace std;
-
 unsigned int machine_wins = 0;
 unsigned int player_points = 0;
-set<string> serial_buffer;
-set<string> serial_levels;
 
-void serial_debug(string &msg) {
+std::set<std::string> serial_buffer;
+std::set<std::string> serial_levels;
+
+void serial_debug(std::string& msg) {
 #ifdef TTT_DEBUG
 	if (Serial.available()) {
-		for(string buffer_object: serial_buffer) {
+		for (std::string& buffer_object: serial_buffer) {
 			Serial.println(("buffer: "+buffer_object).c_str());
 		}
 		Serial.println(msg.c_str());
@@ -45,7 +34,7 @@ void serial_debug(string &msg) {
 #endif
 }
 
-void serial_debug_enter(string &level) {
+void serial_debug_enter(std::string& level) {
 #ifdef TTT_DEBUG
 	if (serial_levels.find(level) == serial_levels.end()) {
 		serial_levels.insert(level);
@@ -64,7 +53,7 @@ void serial_debug_exit() {
 #endif
 }
 
-void warn(string& msg) {
+void warn(std::string& msg) {
 	if (Serial.available()) {
 		Serial.println(("!WARN! " + msg).c_str());
 	}
@@ -81,9 +70,10 @@ void warn(string& msg) {
  * Pins: LCD=>12,11,5,4,3,2 SEL1=>6 SEL2=>7 SEL=>8
  */
 #define TTT_FIRST_CHAR 'X'
+#define DoThreeTimes for (size_t q = 0; q < 3; ++q)
 
 // variables that are volatile
-string lcd_lines[4];
+std::string lcd_lines[4];
 
 // should not be reset anywhere
 char machine_score = 0;
@@ -91,7 +81,7 @@ char player_score = 0;
 char current_turn;
 
 // simplification of position representation
-struct Position {
+typedef struct Position {
 	unsigned char x;
 	unsigned char y;
 };
@@ -128,9 +118,6 @@ char get_cell(char x, char y) {
 // ----- LCD START -----
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
-// replacements use map<string, string>, but that is too long.
-typedef map<string, string> ReplaceMap;
-
 // board cell selection increment; this uses an algorithm similar to converting numbers of different bases.
 void selection_operation(bool add) {
 	char uninum = selected_position.y * 3 + selected_position.x;
@@ -151,43 +138,12 @@ void sel_decr() {
 const byte cursor_char[8] = {
 	B11111,
 	B11111,
-	B11011,
-	B10101,
-	B11011,
+	B11111,
+	B10001,
+	B11111,
 	B11111,
 	B11111
 };
-
-// LCD formatting backbone; x first, y second for cell expressions
-const string lcd_backbone[4] = {
-	"{line0}{cell00}|{cell10}|{cell20}",
-	"{line1}{cell01}|{cell11}|{cell21}",
-	"{line2}{cell02}|{cell12}|{cell22}",
-	"{line3} TTT MP"
-};
-
-// Use this function to replace all {...}s with actual values
-void replace_var(string& orig, const ReplaceMap& keyval) {
-	size_t loc;
-	for (auto keyval_pair: keyval) {
-		loc = orig.find("{" + keyval_pair.first + "}");
-		if (loc != string::npos) {
-			orig.replace(loc, keyval_pair.first.length() + 2, keyval_pair.second);
-			continue;
-		}
-		warn("replace_var: var not found: " + keyval_pair.first + " from " + orig);
-	}
-}
-
-// fill line[0-3] to reach 15 (desired length) for correct board display.
-// manipulates the powerful stream capabilities
-string& fill_line_msg(string& line) {
-	stringstream ss;
-	ss << left << setfill(' ') << setw(15) << line;
-	line = ss.str();
-	return line;
-	// does not get deleted because it is a parameter
-}
 
 // ready the LCD for further actions
 void lcd_setup() {
@@ -195,90 +151,77 @@ void lcd_setup() {
 	lcd.begin(20, 4);
 }
 
-// generate key -> value pairs like {cell00} -> 'O' and {cell20} -> '\0'
-ReplaceMap generate_row_cell_keyvals(char y) {
-	ReplaceMap keyval;
-	for (char x = 0; x < 3; ++x) {
-		keyval["cell" + to_string(x) + to_string(y)] = get_cell(x, y);
-	}
-}
-
-// calls the previous function 3 times to get all cells returned
-ReplaceMap generate_all_cells_keyvals() {
-	ReplaceMap output;
-	ReplaceMap per_row;
-	for (char y = 0; y < 3; ++y) {
-		per_row = generate_row_cell_keyvals(y);
-		output.insert(per_row.start(), per_row.end());
-	}
-	return output;
-}
-
 // update a line of information on the LCD. (argument should be in range of 0 to 3)
-void lcd_update_line(char line) {
-	ReplaceMap all_keyval;
-	
-	// if first 3 lines, then generate keyvals
-	if (line < 3) {
-		ReplaceMap cell_keyval = generate_row_cell_keyvals(line);
-		all_keyval.insert(cell_keyval.start(), cell_keyval.end());
-	}
-	
-	all_keyval["line" + to_string(line)] = fill_line_msg(lcd_lines[line]);
+void lcd_update_line(unsigned char line)
+{
 	lcd.setCursor(0, line);
-	string line_output = lcd_backbone[line];
-	replace_var(line_output, all_keyval);
-	if (line_output.length() != 20) 
-		warn("lcd_update_line: line_output is not 20 chars long: " + line_output);
-	lcd.print(line_output);	
+	lcd.print(lcd_lines[line].c_str());
+	if (line < 3) {
+		lcd.setCursor(14, line);
+		char[5] board_row = {};
+		
+		DoThreeTimes {
+			board_row[2*q] = get_cell(2*q, line);
+		}
+		
+		char[1] = '|';
+		char[3] = '|';
+		
+		lcd.print(board_row);
+	}
 }
 
-void set_line(char linenum, string content) {
+void set_line(unsigned char linenum, string content)
+{
 	lcd_lines[linenum] = content;
 	lcd_update_line(linenum);
 }
 
 // update all lines
-void lcd_render() {
+void lcd_render()
+{
 	for (char i = 0; i < 4; ++i) {
 		lcd_update_line(i);
 	}
 }
 
 // sets the cursor to the specified position
-void place_cursor(Position& pos) {
+void place_cursor(Position& pos)
+{
 	// x = 0 -> col = 15; x = 1 -> col = 17; x = 2 -> col = 19; y -> row
 	lcd.setCursor(15 + (pos.x * 2), pos.y);
 }
 
 // sets a cell to a certain value; great for board manipulation
-void render_cell(Position& pos, char value) {
+void render_cell(Position& pos, char value)
+{
 	place_cursor(pos);
 	lcd.write(value);
 }
 
 // updates a row of cells on the board
-void update_row(char row_num) {
-	for (char x = 0; x < 3; ++x) {
-		render_cell(get_pos(x, row_num), selected_position == get_pos(x, row_num) ?
-			0 : get_cell(x, row_num));
+void update_row(char row_num)
+{
+	DoThreeTimes {
+		render_cell(get_pos(q, row_num), selected_position == get_pos(q, row_num) ?
+			0 : get_cell(q, row_num));
 	}
 }
 
 // enumerate calling update_row to update entire board
 void update_board() {
-	for (char y = 0; y < 3; ++y) {
-		update_row(y);
+	DoThreeTimes {
+		update_row(q);
 	}
 }
 
 // updates score counter (last line)
 void lcd_score() {
-	set_line(3, "Player: " + to_string(player_score) + "; Self: " + to_string(machine_score));
+	set_line(3, "Player: " + std::string(player_score) + "; Self: " + std::string(machine_score));
 }
 
 void clear_lines() {
-	for (short i = 0; i < 4; ++i) {
+	for (size_t i = 0; i < 4; ++i) {
 		set_line(i, "");
 	}
 }
