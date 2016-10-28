@@ -11,6 +11,8 @@
 
 #include <set>
 #include <string>
+#include <cmath>
+#include <sstream>
 
 #define TTT_ARDUINO
 #define TTT_DEBUG
@@ -115,6 +117,37 @@ char get_cell(char x, char y) {
 	return board[y][x];
 }
 
+template<typename T>
+std::string to_string(T& i)
+{
+	std::stringstream sstr("");
+	sstr << i;
+	return sstr.str();
+}
+
+// std::to_string alternative
+template<typename T>
+std::string format(std::string orig, std::set<T> slist) {
+	size_t startpos = 0;
+	for (size_t i = 0; i < slist.size(); ++i) {
+		while ((startpos = orig.find(
+						"{" + to_string<T>(i) + "}")) != std::string::npos) {
+			orig.replace(startpos, std::floor(std::log10(std::abs(i))) + 1, slist[i]);
+		}
+	}
+}
+
+// returns whether a == b
+bool equals(Condition& a, Condition& b) {
+	for (size_t c = 0; c < 3; ++c) {
+		for (size_t d = 0; d < 3; ++d) {
+			if (a[c][d] != b[c][d])
+				return false;
+		}
+	}
+	return true;
+}
+
 // ----- LCD START -----
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
@@ -135,7 +168,7 @@ void sel_decr() {
 }
 
 // Cursor character for cell selection
-const byte cursor_char[8] = {
+byte cursor_char[8] = {
 	B11111,
 	B11111,
 	B11111,
@@ -158,21 +191,23 @@ void lcd_update_line(unsigned char line)
 	lcd.print(lcd_lines[line].c_str());
 	if (line < 3) {
 		lcd.setCursor(14, line);
-		char[5] board_row = {};
+		char board_row[5] = {};
 		
 		DoThreeTimes {
 			board_row[2*q] = get_cell(2*q, line);
 		}
 		
-		char[1] = '|';
-		char[3] = '|';
+		board_row[1] = '|';
+		board_row[3] = '|';
 		
 		lcd.print(board_row);
 	}
 }
 
-void set_line(unsigned char linenum, string content)
+void set_line(unsigned char linenum, std::string content)
 {
+	if (linenum < 3 && content.size() > 15)
+		warn(format("While setting line for linenum {0}, content size > 15", linenum));
 	lcd_lines[linenum] = content;
 	lcd_update_line(linenum);
 }
@@ -203,7 +238,7 @@ void render_cell(Position& pos, char value)
 void update_row(char row_num)
 {
 	DoThreeTimes {
-		render_cell(get_pos(q, row_num), selected_position == get_pos(q, row_num) ?
+		render_cell(get_pos(q, row_num), equals(selected_position, get_pos(q, row_num)) ?
 			0 : get_cell(q, row_num));
 	}
 }
@@ -217,7 +252,7 @@ void update_board() {
 
 // updates score counter (last line)
 void lcd_score() {
-	set_line(3, "Player: " + std::string(player_score) + "; Self: " + std::string(machine_score));
+	set_line(3, format(std::string("Player: {0}; Self: {1}"), {player_score, machine_score}));
 }
 
 void clear_lines() {
@@ -242,8 +277,8 @@ void set_cell(Condition& cond, char x, char y, char val) {
 }
 
 // returns all cells on the board that are not occupied (has ' ' value)
-set<Position> get_vacant_cells(Condition& cond) {
-	set<Position> positions;
+std::set<Position> get_vacant_cells(Condition& cond) {
+	std::set<Position> positions;
 
 	// iterate through all cells	
 	for (char y = 0; y < 3; ++y) {
@@ -256,7 +291,7 @@ set<Position> get_vacant_cells(Condition& cond) {
 	return positions;
 }
 
-const array<array<pair<char, char>, 3>, 8> winning_patterns = {{
+const std::array<std::array<std::pair<char, char>, 3>, 8> winning_patterns = {{
 	{{0,0}, {1,0}, {2,0}},
 	{{0,1}, {1,1}, {2,1}},
 	{{0,2}, {1,2}, {2,2}},
@@ -270,7 +305,7 @@ const array<array<pair<char, char>, 3>, 8> winning_patterns = {{
 }};
 
 // a shorthand for get_winner function
-char cell_at(pair<char, char>& pos) {
+char cell_at(std::pair<char, char>& pos) {
 	return get_cell(pos.first(), pos.second());
 }
 
@@ -286,7 +321,7 @@ char get_winner(Condition& condition) {
 	return ' ';
 }
 
-char player_char() {
+const char player_char() {
 	return other(machine_char);
 }
 
@@ -302,73 +337,20 @@ void clear_board() {
 	}
 }
 
-char other(char orig) {
+const char other(char orig) {
 	if (orig != 'O' && orig != 'X') {
-		warn("Invalid parameter(orig): " + to_string(orig));
+		warn("Invalid parameter(orig): {0}" + orig);
 		return ' ';
 	}
 	return orig == 'O' ? 'X' : 'O';
 }
 
+constexpr char const_machine()
+{
+	return static_cast<const char>(machine_char);
+}
+
 // ----- BOARD MANIPULATION END -----
-// ----- ALGORITHM START -----
-
-// returns score of worst move
-char min_move(Condition cond, long depth) {
-	char winner = get_winner(cond);
-	if (winner != ' ')
-		return get_score(winner, depth);
-
-	char this_score;
-	char lowest_score = 127; // highest char possible
-	for (Position& vacant_pos: get_vacant_cells(cond)) {
-		set_cell(cond, vacant_pos.x, vacant_pos.y, machine_char);
-		this_score = max_move(cond, depth+1);
-		if (this_score < lowest_score)
-			lowest_score = this_score;
-		set_cell(cond, vacant_pos.x, vacant_pos.y, ' ');
-	}
-
-	return lowest_score;
-}
-
-// returns score of best move
-char max_move(Condition cond, long depth) {
-	char winner = get_winner(cond);
-	if (winner != ' ')
-		return get_score(winner, depth);
-
-	char this_score;
-	char highest_score = -127; // lowest signed char possible
-	for (Position& vacant_pos: get_vacant_cells(cond)) {
-		set_cell(cond, vacant_pos.x, vacant_pos.y, player_char());
-		this_score = min_move(cond, depth+1);
-		if (this_score > highest_score)
-			highest_score = this_score;
-		set_cell(cond, vacant_pos.x, vacant_pos.y, ' ');
-	}
-
-	return highest_score;
-}
-
-Position minimax(Condition cond) {
-	char best_score = -127;
-	Position best_move;
-	
-	char score;
-	for (Position& vacant_pos: get_vacant_cells(cond)) {
-		set_cell(cond, vacant_pos.x, vacant_pos.y, machine_char);
-		score = max_move(cond, 1);
-		if (score > best_score) {
-			best_score = score;
-			best_move = vacant_pos;
-		}
-	}
-
-	return best_move;
-}
-
-// ----- ALGORITHM END -----
 
 // ----- SIMPLE BUTTON MANIPULATION -----
 // pin numbers
@@ -383,7 +365,7 @@ void setup_buttons() {
 	pinMode(SEL, INPUT);
 }
 
-short waitbtn(short[] btn_pins) {
+short waitbtn(short btn_pins[]) {
 	while (true) {
 		for (short btnpin: btn_pins) {
 			if (digitalRead(btnpin) == HIGH)
@@ -446,10 +428,10 @@ void loop()
 			other(TTT_FIRST_CHAR));
 		current_turn = (choice == SEL1 ? machine_char : player_char());
 	}
-	while (get_winner() == ' ') {	
+	while (get_winner(board) == ' ') {	
 		if (current_turn == machine_char) {
 			set_line(0, "My turn");
-			set_cell(minimax((Condition) board), current_turn);
+			set_cell(minimax(static_cast<Condition>(board)), current_turn);
 		} else {
 			set_line(0, "Your turn");
 			user_cell_choice();
@@ -465,7 +447,7 @@ void loop()
 		// tie
 		set_line(1, "Tie!");
 		break;
-	case machine_char:
+	case const_machine():
 		// machine wins
 		set_line(1, "I win!");
 		break;
@@ -475,7 +457,7 @@ void loop()
 		set_line(2, "Unbelievable.");
 	default:
 		set_line(3, "ERROR! winner");
-		warn("Winner char unknown -> " + to_string(get_winner()));
+		warn("Winner char unknown -> " + std::to_string(get_winner()));
 	}
 	set_line(0, "SEL for new game");
 	wait_button(SEL);
