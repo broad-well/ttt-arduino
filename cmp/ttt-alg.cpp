@@ -22,7 +22,6 @@
 #include <array>
 #include <algorithm>
 #include <vector>
-#include <valarray>
 #include <limits>
 
 using namespace std;
@@ -75,9 +74,13 @@ char board_winner(const Board& board)
 // prints the board parameter in a way that humans understand.
 void print_board(const Board& board)
 {
-	cout << board[0] << '|' << board[1] << '|' << board[2] << endl <<
-	        board[3] << '|' << board[4] << '|' << board[5] << endl <<
-	        board[6] << '|' << board[7] << '|' << board[8] << endl;
+		cout  << "┌───┬───┬───┐" << endl
+					<< "│ " << board[0] << " │ " << board[1] << " │ " << board[2] << " │" << endl
+					<< "│───┼───┼───│" << endl
+					<< "│ " << board[3] << " │ " << board[4] << " │ " << board[5] << " │" << endl
+					<< "│───┼───┼───│" << endl
+					<< "│ " << board[6] << " │ " << board[7] << " │ " << board[8] << " │" << endl
+					<< "└───┴───┴───┘" << endl;
 }
 
 // constructs a board object from string.
@@ -258,23 +261,48 @@ void play_game(bool machine_first)
 	short user_choice = -1;
 	while (score(brd, true) == 0 &&
 	       !is_full(brd)) {
+		print_board(brd);
 		if (whose_turn == machine) {
+			cout << "Thinking..." << endl;
 			brd[minimax(brd)] = machine;
-			print_board(brd);
 		} else {
 			cout << "input choice here =>";
 			cin >> user_choice;
 			brd[user_choice] = inverse(machine);
-			print_board(brd);
 		}
+		cout << "\e[1A\e[2K\e[7A\r";
 		whose_turn = inverse(whose_turn);
 	}
+	cout << "\e[2K";
+	char winner = board_winner(brd);
+	if (winner == machine) {
+		cout << "I win. Ha :D" << endl;
+	} else if (winner == ' ') {
+		cout << "Tie" << endl;
+	} else {
+		cout << "You win. Unbelievable. ;(" << endl;
+	}
+	cout << "Board for reference: " << endl;
+	print_board(brd);
 }
 
 /* ========== Main Routine ========== */
 
 int main(int argc, const char** argv)
 {
+	bool machine_first;
+	cout << "1 for me first, 0 for you first >";
+	cin >> machine_first;
+
 	srand(time(NULL));
-	play_game(false);
+	// helper
+	cout << "When inputting choice, follow this chart for desired cell:" << endl
+		<< "┌───┬───┬───┐" << endl
+		<< "│ 0 │ 1 │ 2 │" << endl
+		<< "│───┼───┼───│" << endl
+		<< "│ 3 │ 4 │ 5 │" << endl
+		<< "│───┼───┼───│" << endl
+		<< "│ 6 │ 7 │ 8 │" << endl
+		<< "└───┴───┴───┘" << endl;
+	play_game(machine_first);
 }
