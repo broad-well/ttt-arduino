@@ -22,6 +22,8 @@
 #include <array>
 #include <algorithm>
 #include <vector>
+#include <valarray>
+#include <limits>
 
 using namespace std;
 
@@ -37,7 +39,7 @@ typedef array<char, 9> Board;
 
 // deduces the winner of the board.
 // return values: 'o', 'x', or ' ' for no winner
-char board_winner(Board& board)
+char board_winner(const Board& board)
 {
 	// winning patterns
 	const short WIN_PTNS[8][3] = {
@@ -129,17 +131,150 @@ bool is_full(const Board& board)
 	return find(board.begin(), board.end(), ' ') == board.end();
 }
 
-// TODO: Algorithm section
+/* ========== Algorithms ========== */
+
+// returns 'x' for 'o' and 'o' for 'x', '!' otherwise
+char inverse(char input)
+{
+	switch (input) {
+		case 'x':
+			return 'o';
+		case 'o':
+			return 'x';
+		default:
+			return '!';
+	}
+}
+
+// returns the preferability score for the given board in the perspective of
+// the given player (ismachine)
+short score(const Board& board, bool is_machine)
+{
+	char winner = board_winner(board);
+	if (winner == ' ')
+		return 0;
+
+	return is_machine ? (winner == machine ? 1 : -1) :
+		         (winner == inverse(machine) ? 1 : -1);
+}
+
+// returns a random index of the given vector that points to (one of) the largest 
+// numbers in it
+unsigned int rand_max_index(const vector<int>& vect)
+{
+	vector<unsigned int> occurrences;
+	int largest_occurred = numeric_limits<int>::min();
+
+	for (unsigned int i = 0; i < vect.size(); ++i) {
+		if (vect[i] > largest_occurred) {
+			largest_occurred = vect[i];
+			occurrences = {i};
+		} else if (vect[i] == largest_occurred) {
+			occurrences.push_back(i);
+		}
+	}
+	
+	// suffers from distribution problem, but no uniform distribution required
+	return occurrences[rand() % occurrences.size()];
+}
+
+// returns a random index of the given vector that points to (one of) the
+// smallest numbers in it
+unsigned int rand_min_index(const vector<int>& varr)
+{
+	vector<unsigned int> occurrences;
+	int smallest_occurred = numeric_limits<int>::max();
+
+	for (unsigned int i = 0; i < varr.size(); ++i) {
+		if (varr[i] < smallest_occurred) {
+			smallest_occurred = varr[i];
+			occurrences = {i};
+		} else if (varr[i] == smallest_occurred) {
+			occurrences.push_back(i);
+		}
+	}
+
+	return occurrences[rand() % occurrences.size()];
+}
+
+// the internal function of MiniMax, called recursively.
+int minimax_internal(Board board, unsigned short depth, bool ismachine)
+{
+	short initial_score = score(board, ismachine);
+	if (initial_score != 0) {
+		return ismachine ?
+			initial_score * (10 - depth) :
+			initial_score * (depth - 10);
+	}
+	if (is_full(board))
+		return 0;
+
+	// insertion-ordered mapping from move to score, plus individual vector manipulation
+	// should be at same size at any time except between insertions in loop
+	vector<short> moves;
+	vector<int> scores;
+	Board hypo_board;
+	for (short& _move: empty_cells(board)) {
+		hypo_board = board;
+		hypo_board[_move] = ismachine ? machine : inverse(machine);
+
+		moves.push_back(_move);
+		scores.push_back(minimax_internal(hypo_board, depth+1, !ismachine));
+	}
+
+	unsigned int chosen_index = ismachine ?
+		rand_max_index(scores) : rand_min_index(scores);
+	return scores[chosen_index];
+}
+
+// the external function of minimax, returns desired move, or -1 if game over
+short minimax(const Board& board)
+{
+	if (score(board, true) != 0 ||
+			is_full(board))
+		return -1;
+
+	vector<short> moves;
+	vector<int> scores;
+	Board hypo_board;
+	for (short& _move: empty_cells(board)) {
+		hypo_board = board;
+		hypo_board[_move] = machine;
+
+		moves.push_back(_move);
+		scores.push_back(minimax_internal(hypo_board, 1, false));
+	}
+	
+	return moves[rand_max_index(scores)];
+}
+
+/* ========== Interactive ========== */
+
+void play_game(bool machine_first)
+{
+	machine = machine_first ? 'x' : 'o';
+	char whose_turn = 'x';
+	Board brd = clean_board();
+	short user_choice = -1;
+	while (score(brd, true) == 0 &&
+	       !is_full(brd)) {
+		if (whose_turn == machine) {
+			brd[minimax(brd)] = machine;
+			print_board(brd);
+		} else {
+			cout << "input choice here =>";
+			cin >> user_choice;
+			brd[user_choice] = inverse(machine);
+			print_board(brd);
+		}
+		whose_turn = inverse(whose_turn);
+	}
+}
 
 /* ========== Main Routine ========== */
 
 int main(int argc, const char** argv)
 {
-	Board b = board_from_input();
-	cout << "winner: " << board_winner(b) << endl;
-	cout << "emptycells: ";
-	for (short cindex: empty_cells(b)) {
-		cout << cindex << ' ';
-	};
-	cout << endl << "is full?: " << is_full(b) << endl;
+	srand(time(NULL));
+	play_game(false);
 }
