@@ -43,10 +43,10 @@ def board_other(i):
     return ('o', 'x')[i == 'o']
 
 def board_score(board, ismachine):
-    """ Returns a score for the given player with the board as the 
+    """ Returns a score for the given player with the board as the
         querying condition. win=1, tie=0, loss=-1 """
     board_result = board_winner(board)
-    return 1 if (board_result == 
+    return 1 if (board_result ==
             (machine_char if ismachine else board_other(machine_char))) \
             else (0 if board_result in [' ', None] else -1)
 
