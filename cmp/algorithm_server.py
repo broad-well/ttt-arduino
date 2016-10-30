@@ -128,4 +128,5 @@ def interactive(machine_first):
 
 # run this for interactive
 if __name__ == '__main__':
-    interactive(False)
+    mf = input("Machine first? [0,1]")
+    interactive(mf == '1')
