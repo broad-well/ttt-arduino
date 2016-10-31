@@ -231,6 +231,7 @@ int minimax_internal(Board board, unsigned short depth, bool ismachine)
 }
 
 // the external function of minimax, returns desired move, or -1 if game over
+// simplified version of minimax_internal
 short minimax(const Board& board)
 {
 	if (score(board, true) != 0 ||
@@ -255,24 +256,35 @@ short minimax(const Board& board)
 
 void play_game(bool machine_first)
 {
+	// prepare game by defining turn variables and obtaining clean board
 	machine = machine_first ? 'x' : 'o';
 	char whose_turn = 'x';
 	Board brd = clean_board();
-	short user_choice = -1;
+
+	// main game loop
 	while (score(brd, true) == 0 &&
 	       !is_full(brd)) {
+
+		// present the game to the player
 		print_board(brd);
+		// obtain decisions
 		if (whose_turn == machine) {
+
 			cout << "Thinking..." << endl;
 			brd[minimax(brd)] = machine;
+
 		} else {
+
 			cout << "input choice here =>";
+			short user_choice;
 			cin >> user_choice;
 			brd[user_choice] = inverse(machine);
 		}
+		// clear the message and relocate the cursor
 		cout << "\e[1A\e[2K\e[7A\r";
 		whose_turn = inverse(whose_turn);
 	}
+	// intended to clear the 1st line of the board
 	cout << "\e[2K";
 	char winner = board_winner(brd);
 	if (winner == machine) {
