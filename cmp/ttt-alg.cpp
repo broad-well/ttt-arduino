@@ -23,6 +23,19 @@
 #include <algorithm>
 #include <vector>
 #include <limits>
+// sleep is used later
+#ifdef __GNUC__
+
+#include <unistd.h>
+#define unisleep(x) sleep(x)
+
+#endif
+#ifdef _WIN32
+
+#include <cstdlib>
+#define unisleep(x) _sleep(x*1000)
+
+#endif
 
 using namespace std;
 
@@ -75,9 +88,9 @@ void print_board(const Board& board)
 {
 		cout  << "┌───┬───┬───┐" << endl
 					<< "│ " << board[0] << " │ " << board[1] << " │ " << board[2] << " │" << endl
-					<< "│───┼───┼───│" << endl
+					<< "├───┼───┼───┤" << endl
 					<< "│ " << board[3] << " │ " << board[4] << " │ " << board[5] << " │" << endl
-					<< "│───┼───┼───│" << endl
+					<< "├───┼───┼───┤" << endl
 					<< "│ " << board[6] << " │ " << board[7] << " │ " << board[8] << " │" << endl
 					<< "└───┴───┴───┘" << endl;
 }
@@ -258,6 +271,7 @@ void play_game(bool machine_first)
 	// prepare game by defining turn variables and obtaining clean board
 	machine = machine_first ? 'x' : 'o';
 	char whose_turn = 'x';
+	cout << "You are " << inverse(machine) << endl;
 	Board brd = clean_board();
 
 	// main game loop
@@ -273,10 +287,21 @@ void play_game(bool machine_first)
 			brd[minimax(brd)] = machine;
 
 		} else {
+			
+			// Goto is bad for readability, but it's in the proximity, so bear with it.
+wait_user_choice:
 
 			cout << "input choice here =>";
 			short user_choice;
 			cin >> user_choice;
+
+			// we don't trust the player
+			if (brd[user_choice] != ' ') {
+				cout << "That cell is occupied!" << endl;
+				unisleep(2);
+				cout << "\e[2K\e[1A\e[2K\e[1A";
+				goto wait_user_choice;
+			}
 			brd[user_choice] = inverse(machine);
 		}
 		// clear the message and relocate the cursor
@@ -310,9 +335,9 @@ int main(int argc, const char** argv)
 	cout << "When inputting choice, follow this chart for desired cell:" << endl
 		<< "┌───┬───┬───┐" << endl
 		<< "│ 0 │ 1 │ 2 │" << endl
-		<< "│───┼───┼───│" << endl
+		<< "├───┼───┼───┤" << endl
 		<< "│ 3 │ 4 │ 5 │" << endl
-		<< "│───┼───┼───│" << endl
+		<< "├───┼───┼───┤" << endl
 		<< "│ 6 │ 7 │ 8 │" << endl
 		<< "└───┴───┴───┘" << endl;
 	play_game(machine_first);
