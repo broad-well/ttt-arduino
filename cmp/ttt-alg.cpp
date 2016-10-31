@@ -5,12 +5,12 @@
  *
  *    Description:  Tic Tac Toe algorithm
  *
- *        Version:  0.2-alpha
+ *        Version:  0.3-alpha
  *        Created:  10/28/2016 07:07:05 PM
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  Michael Peng, 
+ *         Author:  Michael Peng
  *   Organization:  A.E. Kent Middle School
  *
  * =====================================================================================
@@ -57,10 +57,9 @@ char board_winner(const Board& board)
 		{2, 4, 6}
 	};
 
-	char first_cell = ' ';
 	for (auto& win_ptn: WIN_PTNS) {
 		// check if all cells referenced from this array are equal in value
-		first_cell = board[win_ptn[0]];
+		char first_cell = board[win_ptn[0]];
 		if (board[win_ptn[1]] == first_cell &&
 				board[win_ptn[2]] == first_cell) {
 			return first_cell;
@@ -96,7 +95,7 @@ Board board_from_input()
 {
 	cout << "Please type the board below" << endl;
 	stringstream boardstr;
-	
+
 	// used in the loop, declared outside
 	string segment;
 	for (size_t i = 0; i < 3; ++i) {
@@ -161,7 +160,7 @@ short score(const Board& board, bool is_machine)
 		         (winner == inverse(machine) ? 1 : -1);
 }
 
-// returns a random index of the given vector that points to (one of) the largest 
+// returns a random index of the given vector that points to (one of) the largest
 // numbers in it
 unsigned int rand_max_index(const vector<int>& vect)
 {
@@ -176,7 +175,7 @@ unsigned int rand_max_index(const vector<int>& vect)
 			occurrences.push_back(i);
 		}
 	}
-	
+
 	// suffers from distribution problem, but no uniform distribution required
 	return occurrences[rand() % occurrences.size()];
 }
@@ -248,7 +247,7 @@ short minimax(const Board& board)
 		moves.push_back(_move);
 		scores.push_back(minimax_internal(hypo_board, 1, false));
 	}
-	
+
 	return moves[rand_max_index(scores)];
 }
 
