@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <vector>
 #include <limits>
+#include <fstream>
 // sleep is used later
 #ifdef __GNUC__
 
@@ -37,7 +38,40 @@
 
 #endif
 
+// debug setup
+#define TTT_DEBUG
+#define DEBUG_FNAME "/tmp/ttt-debug.log"
+
 using namespace std;
+
+/* ========== Debug Routines ========== */
+
+#ifdef TTT_DEBUG
+
+fstream debug_file;
+
+void debug_init()
+{
+	debug_file.open(DEBUG_FNAME, iostream::out);
+}
+
+void debug_write(const string& msg)
+{
+	debug_file << msg << endl;
+}
+
+void debug_exit()
+{
+	debug_file.close();
+}
+
+#else
+
+#define debug_init()
+#define debug_write(m)
+#define debug_exit()
+
+#endif
 
 /* ========== Global Variables, Typedefs ========== */
 
@@ -51,6 +85,8 @@ typedef array<char, 9> Board;
 
 // deduces the winner of the board.
 // return values: 'o', 'x', or ' ' for no winner
+// following function is declared later
+string board_to_string(const Board& board);
 char board_winner(const Board& board)
 {
 	// winning patterns
@@ -72,8 +108,10 @@ char board_winner(const Board& board)
 
 	for (auto& win_ptn: WIN_PTNS) {
 		// check if all cells referenced from this array are equal in value
+		// previous bug: prematurely returned ' ' from loop
 		char first_cell = board[win_ptn[0]];
-		if (board[win_ptn[1]] == first_cell &&
+		if (first_cell != ' ' &&
+				board[win_ptn[1]] == first_cell &&
 				board[win_ptn[2]] == first_cell) {
 			return first_cell;
 		}
@@ -144,6 +182,24 @@ Board clean_board()
 bool is_full(const Board& board)
 {
 	return find(board.begin(), board.end(), ' ') == board.end();
+}
+
+// returns a string that represents a certain move.
+string fmt_move(char player, short index)
+{
+	stringstream output;
+	output << 'm' << player << index;
+	return output.str();
+}
+
+// returns a string that represents a certain board.
+string board_to_string(const Board& brd)
+{
+	stringstream output;
+	for (size_t i = 0; i < 9; ++i) {
+		output << brd[i];
+	}
+	return output.str();
 }
 
 /* ========== Algorithms ========== */
@@ -284,10 +340,11 @@ void play_game(bool machine_first)
 		if (whose_turn == machine) {
 
 			cout << "Thinking..." << endl;
-			brd[minimax(brd)] = machine;
+			unsigned short machine_decision = minimax(brd);
+			brd[machine_decision] = machine;
+			debug_write("move: " + fmt_move(machine, machine_decision));
 
 		} else {
-			
 			// Goto is bad for readability, but it's in the proximity, so bear with it.
 wait_user_choice:
 
@@ -303,10 +360,12 @@ wait_user_choice:
 				goto wait_user_choice;
 			}
 			brd[user_choice] = inverse(machine);
+			debug_write("move: " + fmt_move(inverse(machine), user_choice));
 		}
 		// clear the message and relocate the cursor
 		cout << "\e[1A\e[2K\e[7A\r";
 		whose_turn = inverse(whose_turn);
+		debug_write("board: " + board_to_string(brd));
 	}
 	// intended to clear the 1st line of the board
 	cout << "\e[2K";
@@ -326,6 +385,7 @@ wait_user_choice:
 
 int main(int argc, const char** argv)
 {
+	debug_init();
 	bool machine_first;
 	cout << "1 for me first, 0 for you first >";
 	cin >> machine_first;
@@ -341,4 +401,5 @@ int main(int argc, const char** argv)
 		<< "│ 6 │ 7 │ 8 │" << endl
 		<< "└───┴───┴───┘" << endl;
 	play_game(machine_first);
+	debug_exit();
 }
