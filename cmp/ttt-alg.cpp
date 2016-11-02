@@ -48,6 +48,7 @@ using namespace std;
 
 #ifdef TTT_DEBUG
 
+#pragma message "Tic Tac Toe Debug is enabled"
 fstream debug_file;
 
 void debug_init()

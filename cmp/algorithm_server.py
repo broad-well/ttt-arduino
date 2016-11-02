@@ -25,7 +25,7 @@ def board_winner(board):
     pset = None
     for pattern in WIN_PATTERNS:
         pset = set([board[x] for x in pattern])
-        if len(pset) == 1:
+        if len(pset) == 1 and list(pset)[0] != ' ':
             return list(pset)[0]
     return ' '
 
