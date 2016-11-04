@@ -24,6 +24,8 @@
 #include <vector>
 #include <limits>
 #include <fstream>
+#include <chrono>
+#include "termcolor.hpp"
 // sleep is used later
 #ifdef __GNUC__
 
@@ -71,6 +73,16 @@ void debug_exit()
 #define debug_init()
 #define debug_write(m)
 #define debug_exit()
+
+class NullBuffer : public streambuf {
+	public:
+		int overflow(int c) {
+			return c;
+		}
+};
+
+NullBuffer debug_nbuff;
+ostream debug_file(&debug_nbuff);
 
 #endif
 
@@ -122,16 +134,57 @@ char board_winner(const Board& board)
 	return ' ';
 }
 
+// retrieves the cell of given index from the board and adds appropriate prefix
+// to the char, specified by the DEFINEs below.
+#define MACHINE_CELL termcolor::magenta
+#define PLAYER_CELL termcolor::cyan
+const string paint_choice(const Board& board, unsigned short index)
+{
+	debug_file << "paint_choice: board=" << board_to_string(board)
+		<< ",index=" << index << endl;
+	stringstream sstr;
+	sstr << (board[index] == machine ? MACHINE_CELL : PLAYER_CELL) << board[index];
+	sstr << termcolor::reset;
+	debug_file << "paint_choice: result=" << sstr.str() << endl;
+	return sstr.str();
+}
+
+// shorthand function for print_board_row
+const string paint_choice_if(const Board& b, unsigned short i, bool do_)
+{
+	return (do_ ?
+			paint_choice(b, i) :
+			to_string(b[i]));
+}
+
+// returns a row of the board for use by print_board ONLY
+const string print_board_row(const Board& board, bool with_color,
+		unsigned short sindex)
+{
+	debug_file << "print_board_row: " << board_to_string(board) << ","
+		<< with_color << "," << sindex << endl;
+	stringstream sstr;
+	sstr << "│ " <<
+		paint_choice_if(board, sindex, with_color)
+		<< " │ " <<
+		paint_choice_if(board, sindex+1, with_color)
+		<< " │ " <<
+		paint_choice_if(board, sindex+2, with_color)
+		<< " │" << endl;
+	debug_file << "print_board_row: result=" << sstr.str() << endl;
+	return sstr.str();
+}
+
 // prints the board parameter in a way that humans understand.
-void print_board(const Board& board)
+void print_board(const Board& board, bool with_color)
 {
 		cout  << "┌───┬───┬───┐" << endl
-					<< "│ " << board[0] << " │ " << board[1] << " │ " << board[2] << " │" << endl
+					<< print_board_row(board, with_color, 0)
 					<< "├───┼───┼───┤" << endl
-					<< "│ " << board[3] << " │ " << board[4] << " │ " << board[5] << " │" << endl
+					<< print_board_row(board, with_color, 3)
 					<< "├───┼───┼───┤" << endl
-					<< "│ " << board[6] << " │ " << board[7] << " │ " << board[8] << " │" << endl
-					<< "└───┴───┴───┘" << endl;
+					<< print_board_row(board, with_color, 6)
+					<< "└───┴───┴───┘" << endl << termcolor::reset;
 }
 
 // constructs a board object from string.
@@ -323,6 +376,23 @@ short minimax(const Board& board)
 
 /* ========== Interactive ========== */
 
+short get_short_range(const string& prompt, short low, short high)
+{
+	short input;
+	cout << prompt;
+	while (true) {
+		cin >> input;
+		debug_file << "get_short_range: input = " << input << endl;
+		if (input > low && input < high) {
+			break;
+		} else {
+			cout << "\e[1A\e[2KOut of range! " << prompt;
+		}
+	}
+	debug_file << "get_short_range: about to return" << endl;
+	return input;
+}
+
 void play_game(bool machine_first)
 {
 	// prepare game by defining turn variables and obtaining clean board
@@ -336,7 +406,7 @@ void play_game(bool machine_first)
 	       !is_full(brd)) {
 
 		// present the game to the player
-		print_board(brd);
+		print_board(brd, true);
 		// obtain decisions
 		if (whose_turn == machine) {
 
@@ -349,13 +419,15 @@ void play_game(bool machine_first)
 			// Goto is bad for readability, but it's in the proximity, so bear with it.
 wait_user_choice:
 
-			cout << "input choice here =>";
+			cout << termcolor::yellow;
 			short user_choice;
-			cin >> user_choice;
+			user_choice = get_short_range("input choice here =>", -1, 9);
+			cout << termcolor::reset;
 
 			// we don't trust the player
 			if (brd[user_choice] != ' ') {
-				cout << "That cell is occupied!" << endl;
+				cout << termcolor::red <<
+					"That cell is occupied!" << termcolor::reset << endl;
 				unisleep(2);
 				cout << "\e[2K\e[1A\e[2K\e[1A";
 				goto wait_user_choice;
@@ -379,28 +451,32 @@ wait_user_choice:
 		cout << "You win. Unbelievable. ;(" << endl;
 	}
 	cout << "Board for reference: " << endl;
-	print_board(brd);
+	print_board(brd, true);
 }
 
 /* ========== Main Routine ========== */
 
+// all prompts should be yellow
 int main(int argc, const char** argv)
 {
 	debug_init();
+	cout << termcolor::green << "Hello player!" << termcolor::reset << endl;
 	bool machine_first;
-	cout << "1 for me first, 0 for you first >";
-	cin >> machine_first;
+	cout << termcolor::yellow;
+	machine_first =
+		get_short_range("1 for me first, 0 for you first >", -1, 2) == 1;
 
-	srand(time(NULL));
+	srand(chrono::system_clock::now().time_since_epoch().count());
 	// helper
-	cout << "When inputting choice, follow this chart for desired cell:" << endl
+	cout << termcolor::cyan << termcolor::bold <<
+		"When inputting choice, follow this chart for desired cell:" << endl
 		<< "┌───┬───┬───┐" << endl
 		<< "│ 0 │ 1 │ 2 │" << endl
 		<< "├───┼───┼───┤" << endl
 		<< "│ 3 │ 4 │ 5 │" << endl
 		<< "├───┼───┼───┤" << endl
 		<< "│ 6 │ 7 │ 8 │" << endl
-		<< "└───┴───┴───┘" << endl;
+		<< "└───┴───┴───┘" << endl << termcolor::reset;
 	play_game(machine_first);
 	debug_exit();
 }
