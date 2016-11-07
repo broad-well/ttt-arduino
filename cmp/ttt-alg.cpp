@@ -27,7 +27,7 @@
 #include <chrono>
 #include "termcolor.hpp"
 // sleep is used later
-#ifdef __GNUC__
+#if defined(__linux__) || defined(__APPLE__)
 
 #include <unistd.h>
 #define unisleep(x) sleep(x)
@@ -41,7 +41,7 @@
 #endif
 
 // debug setup
-#define TTT_DEBUG
+//#define TTT_DEBUG
 #define DEBUG_FNAME "/tmp/ttt-debug.log"
 
 using namespace std;
@@ -374,6 +374,13 @@ short minimax(const Board& board)
 	return moves[rand_max_index(scores)];
 }
 
+// a dumb strategizer, only gets random index from available cells
+short dumb_strategy(const Board& board)
+{
+	vector<short> empties = empty_cells(board);
+	return empties[ rand() % empties.size() ];
+}
+
 /* ========== Interactive ========== */
 
 short get_short_range(const string& prompt, short low, short high)
@@ -393,7 +400,7 @@ short get_short_range(const string& prompt, short low, short high)
 	return input;
 }
 
-void play_game(bool machine_first)
+void play_game(bool machine_first, short difficulty)
 {
 	// prepare game by defining turn variables and obtaining clean board
 	machine = machine_first ? 'x' : 'o';
@@ -411,7 +418,17 @@ void play_game(bool machine_first)
 		if (whose_turn == machine) {
 
 			cout << "Thinking..." << endl;
-			unsigned short machine_decision = minimax(brd);
+			unsigned short machine_decision;
+			switch (difficulty) {
+				case 0:
+					machine_decision = dumb_strategy(brd);
+					break;
+				case 2:
+					machine_decision = minimax(brd);
+					break;
+				default:
+					cerr << "Bad difficulty!" << endl;
+			}
 			brd[machine_decision] = machine;
 			debug_write("move: " + fmt_move(machine, machine_decision));
 
@@ -448,7 +465,7 @@ wait_user_choice:
 	} else if (winner == ' ') {
 		cout << "Tie" << endl;
 	} else {
-		cout << "You win. Unbelievable. ;(" << endl;
+		cout << "You win. ;(" << endl;
 	}
 	cout << "Board for reference: " << endl;
 	print_board(brd, true);
@@ -465,6 +482,8 @@ int main(int argc, const char** argv)
 	cout << termcolor::yellow;
 	machine_first =
 		get_short_range("1 for me first, 0 for you first >", -1, 2) == 1;
+	short difficulty =
+		get_short_range("0 for Easy, 2 for Impossible >", -1, 3);
 
 	srand(chrono::system_clock::now().time_since_epoch().count());
 	// helper
@@ -477,6 +496,6 @@ int main(int argc, const char** argv)
 		<< "├───┼───┼───┤" << endl
 		<< "│ 6 │ 7 │ 8 │" << endl
 		<< "└───┴───┴───┘" << endl << termcolor::reset;
-	play_game(machine_first);
+	play_game(machine_first, difficulty);
 	debug_exit();
 }
