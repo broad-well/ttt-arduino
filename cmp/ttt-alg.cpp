@@ -41,7 +41,7 @@
 #endif
 
 // debug setup
-//#define TTT_DEBUG
+#define TTT_DEBUG
 #define DEBUG_FNAME "/tmp/ttt-debug.log"
 
 using namespace std;
@@ -98,7 +98,7 @@ typedef array<char, 9> Board;
 
 // deduces the winner of the board.
 // return values: 'o', 'x', or ' ' for no winner
-// following function is declared later
+// following function is defined later
 string board_to_string(const Board& board);
 char board_winner(const Board& board)
 {
@@ -132,84 +132,6 @@ char board_winner(const Board& board)
 
 	// No winners found - could be completely full, could be partly occupied
 	return ' ';
-}
-
-// retrieves the cell of given index from the board and adds appropriate prefix
-// to the char, specified by the DEFINEs below.
-#define MACHINE_CELL termcolor::magenta
-#define PLAYER_CELL termcolor::cyan
-const string paint_choice(const Board& board, unsigned short index)
-{
-	debug_file << "paint_choice: board=" << board_to_string(board)
-		<< ",index=" << index << endl;
-	stringstream sstr;
-	sstr << (board[index] == machine ? MACHINE_CELL : PLAYER_CELL) << board[index];
-	sstr << termcolor::reset;
-	debug_file << "paint_choice: result=" << sstr.str() << endl;
-	return sstr.str();
-}
-
-// shorthand function for print_board_row
-const string paint_choice_if(const Board& b, unsigned short i, bool do_)
-{
-	return (do_ ?
-			paint_choice(b, i) :
-			to_string(b[i]));
-}
-
-// returns a row of the board for use by print_board ONLY
-const string print_board_row(const Board& board, bool with_color,
-		unsigned short sindex)
-{
-	debug_file << "print_board_row: " << board_to_string(board) << ","
-		<< with_color << "," << sindex << endl;
-	stringstream sstr;
-	sstr << "│ " <<
-		paint_choice_if(board, sindex, with_color)
-		<< " │ " <<
-		paint_choice_if(board, sindex+1, with_color)
-		<< " │ " <<
-		paint_choice_if(board, sindex+2, with_color)
-		<< " │" << endl;
-	debug_file << "print_board_row: result=" << sstr.str() << endl;
-	return sstr.str();
-}
-
-// prints the board parameter in a way that humans understand.
-void print_board(const Board& board, bool with_color)
-{
-		cout  << "┌───┬───┬───┐" << endl
-					<< print_board_row(board, with_color, 0)
-					<< "├───┼───┼───┤" << endl
-					<< print_board_row(board, with_color, 3)
-					<< "├───┼───┼───┤" << endl
-					<< print_board_row(board, with_color, 6)
-					<< "└───┴───┴───┘" << endl << termcolor::reset;
-}
-
-// constructs a board object from string.
-Board board_from_string(string str_)
-{
-	Board output;
-	copy(str_.begin(), str_.end(), output.data());
-	return output;
-}
-
-// constructs a board through user input.
-Board board_from_input()
-{
-	cout << "Please type the board below" << endl;
-	stringstream boardstr;
-
-	// used in the loop, declared outside
-	string segment;
-	for (size_t i = 0; i < 3; ++i) {
-		cout << "Row " << i+1 << " >>";
-		getline(cin, segment);
-		boardstr << segment;
-	}
-
-	return board_from_string(boardstr.str());
 }
 
 // returns a vector of board indexes that point to empty cells.
@@ -381,31 +303,71 @@ short dumb_strategy(const Board& board)
 	return empties[ rand() % empties.size() ];
 }
 
-/* ========== Interactive ========== */
+/* ========== Input/Output protocol and tools ========== */
 
-short get_short_range(const string& prompt, short low, short high)
+/* Tic Tac Toe protocol documentation
+ *
+ * Code => description (code is signed short)
+ *
+ * 0 => who first, difficulty
+ * 	 1 = this first, easy
+ * 	 2 = this first, medium
+ * 	 3 = this first, impossible
+ * 	 -1 = opponent first, easy
+ * 	 -2 = opponent first, medium
+ * 	 -3 = opponent first, impossible
+ *
+ * 1 => what cell
+ *   (index 0-8)
+ *
+ * 2 => this is thinking
+ *
+ * 3 => bad cell choice
+ *
+ * 4 => good cell choice
+ *
+ * 5 => game is done
+ *
+ * 20 => this wins
+ * 21 => opponent wins
+ * 22 => tie
+ *
+ * 30 => again?
+ *   (0 no, 1 yes)
+ */
+#define PROTO_WHOFIRST 0
+#define PROTO_WHATCELL 1
+#define PROTO_IMTHINKING 2
+#define PROTO_BADCHOICE 3
+#define PROTO_FINECHOICE 4
+#define PROTO_GAMEDONE 5
+#define PROTO_IWIN 20
+#define PROTO_UWIN 21
+#define PROTO_TIE 22
+#define PROTO_AGAIN 30
+
+// utility function that returns a pair<bool, short>
+// first: true for this first, second: 0=>easy,1=>medium,2=>impossible
+pair<bool, short> parse_whofirst_response(short& resp)
 {
-	short input;
-	cout << prompt;
-	while (true) {
-		cin >> input;
-		debug_file << "get_short_range: input = " << input << endl;
-		if (input > low && input < high) {
-			break;
-		} else {
-			cout << "\e[1A\e[2KOut of range! " << prompt;
-		}
-	}
-	debug_file << "get_short_range: about to return" << endl;
-	return input;
+	return make_pair<bool, short>( resp > 0, abs(resp) - 1 );
 }
+
+short proto_out(short proto);
+short proto_query(short proto_out);
+Board board_in();
+short board_out(const Board& brd);
+
+// Include the communication header here.
+#include "termcomm.hh"
+
+/* ========== Interactive ========== */
 
 void play_game(bool machine_first, short difficulty)
 {
 	// prepare game by defining turn variables and obtaining clean board
 	machine = machine_first ? 'x' : 'o';
 	char whose_turn = 'x';
-	cout << "You are " << inverse(machine) << endl;
 	Board brd = clean_board();
 
 	// main game loop
@@ -413,11 +375,10 @@ void play_game(bool machine_first, short difficulty)
 	       !is_full(brd)) {
 
 		// present the game to the player
-		print_board(brd, true);
+		board_out(brd);
 		// obtain decisions
 		if (whose_turn == machine) {
-
-			cout << "Thinking..." << endl;
+			proto_out(PROTO_IMTHINKING);
 			unsigned short machine_decision;
 			switch (difficulty) {
 				case 0:
@@ -436,39 +397,30 @@ void play_game(bool machine_first, short difficulty)
 			// Goto is bad for readability, but it's in the proximity, so bear with it.
 wait_user_choice:
 
-			cout << termcolor::yellow;
-			short user_choice;
-			user_choice = get_short_range("input choice here =>", -1, 9);
-			cout << termcolor::reset;
+			short user_choice = proto_query(PROTO_WHATCELL);
 
 			// we don't trust the player
 			if (brd[user_choice] != ' ') {
-				cout << termcolor::red <<
-					"That cell is occupied!" << termcolor::reset << endl;
-				unisleep(2);
-				cout << "\e[2K\e[1A\e[2K\e[1A";
+				proto_out(PROTO_BADCHOICE);
 				goto wait_user_choice;
 			}
 			brd[user_choice] = inverse(machine);
 			debug_write("move: " + fmt_move(inverse(machine), user_choice));
 		}
-		// clear the message and relocate the cursor
-		cout << "\e[1A\e[2K\e[7A\r";
+		proto_out(PROTO_FINECHOICE);
 		whose_turn = inverse(whose_turn);
 		debug_write("board: " + board_to_string(brd));
 	}
-	// intended to clear the 1st line of the board
-	cout << "\e[2K";
+	proto_out(PROTO_GAMEDONE);
 	char winner = board_winner(brd);
 	if (winner == machine) {
-		cout << "I win. Ha :D" << endl;
+		proto_out(PROTO_IWIN);
 	} else if (winner == ' ') {
-		cout << "Tie" << endl;
+		proto_out(PROTO_TIE);
 	} else {
-		cout << "You win. ;(" << endl;
+		proto_out(PROTO_UWIN);
 	}
-	cout << "Board for reference: " << endl;
-	print_board(brd, true);
+	board_out(brd);
 }
 
 /* ========== Main Routine ========== */
@@ -477,6 +429,9 @@ wait_user_choice:
 int main(int argc, const char** argv)
 {
 	debug_init();
+#ifdef TTT_DEBUG
+	cout << termcolor::red << "Tic-Tac-Toe Debug is enabled!" << endl;
+#endif
 	cout << termcolor::green << "Hello player!" << termcolor::reset << endl;
 	bool machine_first;
 	cout << termcolor::yellow;
