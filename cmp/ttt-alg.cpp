@@ -41,7 +41,7 @@
 #endif
 
 // debug setup
-#define TTT_DEBUG
+//#define TTT_DEBUG
 #define DEBUG_FNAME "/tmp/ttt-debug.log"
 
 using namespace std;
@@ -249,9 +249,8 @@ int minimax_internal(Board board, unsigned short depth, bool ismachine)
 {
 	short initial_score = score(board, ismachine);
 	if (initial_score != 0) {
-		return ismachine ?
-			initial_score * (10 - depth) :
-			initial_score * (depth - 10);
+		return initial_score *
+			(ismachine ? 10 - depth : depth - 10);
 	}
 	if (is_full(board))
 		return 0;
@@ -348,18 +347,26 @@ short dumb_strategy(const Board& board)
 
 // utility function that returns a pair<bool, short>
 // first: true for this first, second: 0=>easy,1=>medium,2=>impossible
-pair<bool, short> parse_whofirst_response(short& resp)
+pair<bool, short> parse_whofirst_response(short resp)
 {
 	return make_pair<bool, short>( resp > 0, abs(resp) - 1 );
 }
 
+// optional implementations by headers
+void proto_init();
 short proto_out(short proto);
 short proto_query(short proto_out);
 Board board_in();
 short board_out(const Board& brd);
 
 // Include the communication header here.
-#include "termcomm.hh"
+
+// compile command control
+#ifdef COMPILE_RAW
+#include "comm/rawcomm.hh"
+#else
+#include "comm/termcomm.hh"
+#endif
 
 /* ========== Interactive ========== */
 
@@ -389,6 +396,7 @@ void play_game(bool machine_first, short difficulty)
 					break;
 				default:
 					cerr << "Bad difficulty!" << endl;
+					return;
 			}
 			brd[machine_decision] = machine;
 			debug_write("move: " + fmt_move(machine, machine_decision));
@@ -433,12 +441,16 @@ int main(int argc, const char** argv)
 	cout << termcolor::red << "Tic-Tac-Toe Debug is enabled!" << endl;
 #endif
 	cout << termcolor::green << "Hello player!" << termcolor::reset << endl;
+
 	bool machine_first;
-	cout << termcolor::yellow;
-	machine_first =
-		get_short_range("1 for me first, 0 for you first >", -1, 2) == 1;
-	short difficulty =
-		get_short_range("0 for Easy, 2 for Impossible >", -1, 3);
+	short difficulty;
+	{
+		// parse difficulty and who first in a block to ensure `pair` deletion.
+		pair<bool, short> parsed_fd =
+			parse_whofirst_response(proto_query(PROTO_WHOFIRST));
+		machine_first = parsed_fd.first;
+		difficulty = parsed_fd.second;
+	}
 
 	srand(chrono::system_clock::now().time_since_epoch().count());
 	// helper

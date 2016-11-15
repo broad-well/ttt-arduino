@@ -1,6 +1,7 @@
 """ TTT-Arduino Host (algorithm and other memory-intensive tasks) """
 import copy
 import random
+import time
 
 machine_char = ''
 
@@ -119,7 +120,10 @@ def interactive(machine_first):
     board = board_clean()
     while board_winner(board) == ' ' and not board_filled(board):
         if machine_turn:
+            begin_time = time.time()
             board[mm(board, 0, True)[1]] = machine_char
+            print("Solution obtained in {} milliseconds".format(
+                (time.time()-begin_time)*1000))
         else:
             board[int(input("Your choice index ->"))] = \
                     board_other(machine_char)
