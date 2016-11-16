@@ -5,10 +5,10 @@
  *
  *    Description:  Tic Tac Toe algorithm
  *
- *        Version:  0.3-alpha
+ *        Version:  0.5-alpha
  *        Created:  10/28/2016 07:07:05 PM
- *       Revision:  none
- *       Compiler:  gcc
+ *       Revision:  3rd
+ *       Compiler:  gcc/clang
  *
  *         Author:  Michael Peng
  *   Organization:  A.E. Kent Middle School
@@ -368,6 +368,38 @@ short board_out(const Board& brd);
 #include "comm/termcomm.hh"
 #endif
 
+/* ========== Time Profiling ========== */
+
+chrono::time_point<chrono::system_clock> time_at_begin;
+string time_profile_name;
+
+void timer_begin(const string& profname)
+{
+#ifdef COMPILE_PROFILE
+	time_at_begin = chrono::system_clock::now();
+	time_profile_name = profname;
+#endif
+}
+
+long timer_stop()
+{
+#ifdef COMPILE_PROFILE
+	return chrono::duration_cast<chrono::milliseconds>
+		(chrono::system_clock::now() - time_at_begin).count();
+#else
+	return -1;
+#endif
+}
+
+// Note: this function calls `timer_stop`.
+void timer_report_info()
+{
+#ifdef COMPILE_PROFILE
+	cout << termcolor::green << "Profiling: phase '" << time_profile_name
+		<< "' completed in " << timer_stop() << "ms" << endl << termcolor::reset;
+#endif
+}
+
 /* ========== Interactive ========== */
 
 void play_game(bool machine_first, short difficulty)
@@ -387,6 +419,7 @@ void play_game(bool machine_first, short difficulty)
 		if (whose_turn == machine) {
 			proto_out(PROTO_IMTHINKING);
 			unsigned short machine_decision;
+			timer_begin("Machine decision");
 			switch (difficulty) {
 				case 0:
 					machine_decision = dumb_strategy(brd);
@@ -398,6 +431,7 @@ void play_game(bool machine_first, short difficulty)
 					cerr << "Bad difficulty!" << endl;
 					return;
 			}
+			timer_report_info();
 			brd[machine_decision] = machine;
 			debug_write("move: " + fmt_move(machine, machine_decision));
 
@@ -439,6 +473,9 @@ int main(int argc, const char** argv)
 	debug_init();
 #ifdef TTT_DEBUG
 	cout << termcolor::red << "Tic-Tac-Toe Debug is enabled!" << endl;
+#endif
+#ifdef COMPILE_PROFILE
+	cout << termcolor::red << "Time profiling is enabled!" << endl;
 #endif
 	cout << termcolor::green << "Hello player!" << termcolor::reset << endl;
 

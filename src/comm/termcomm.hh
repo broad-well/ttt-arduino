@@ -18,7 +18,6 @@
 
 #ifndef TTT_TERMCOMM
 
-#include "termcolor.hpp"
 #define TTT_TERMCOMM
 
 short get_short_range(const string& prompt, short low, short high)
